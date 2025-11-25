@@ -1,0 +1,104 @@
+---
+title: "myprojectfile"
+author: "Anna Harper"
+date: "`r Sys.Date()`"
+output: github_document
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+
+library("tidytuesdayR")
+library("sf")
+library("tidyverse")
+library("dplyr")
+library("tmap")
+library("rnaturalearth")
+library("ggplot2")
+
+sf_use_s2(FALSE)
+```
+
+```{r, echo=FALSE}
+tuesdata <- tidytuesdayR::tt_load('2025-08-19')
+scottish_munros <- tuesdata$scottish_munros
+
+munro_map <- scottish_munros %>%
+  filter(!is.na(xcoord) & !is.na(ycoord)) %>%
+  st_as_sf(coords=c("xcoord","ycoord"), crs = 27700) %>%
+  st_transform(4326)
+
+projection <- scottish_munros %>%
+  filter(!is.na(xcoord) & !is.na(ycoord)) %>%
+  st_as_sf(coords=c("xcoord","ycoord"), crs = 27700) %>%
+  st_transform(4326) %>%
+  st_coordinates()
+
+munro_map_XY <- munro_map %>%
+  cbind(projection)
+```
+
+```{r, echo=FALSE}
+scotland <- ne_countries(geounit = "scotland", type = "map_units", scale="medium")
+
+water <- ne_download(scale=10, type="lakes", category="physical")
+river <- ne_download(scale=10, type="rivers_lake_centerlines", category="physical")
+
+
+waterscotland <- st_filter(water,scotland)
+riverscotland <- st_filter(river, scotland)
+```
+
+```{r, echo=FALSE}
+munro_points <- munro_map_XY %>%
+  sf::st_drop_geometry() %>%
+  dplyr::filter(!is.na(X2021))
+
+ggplot() +
+  geom_sf(data = scotland) +
+  geom_sf(data = waterscotland, fill = "blue") +
+  geom_sf(data = riverscotland, color = "blue") +
+  geom_point(
+    data = munro_points,
+    aes(x = X, y = Y, color = X2021)
+  ) +
+  coord_sf(xlim = c(-10, 0))
+```
+
+```{r}
+munros_2021_df <- scottish_munros[
+  !is.na(scottish_munros$`2021`) &
+    !grepl("Top", scottish_munros$`2021`) &
+    !is.na(scottish_munros$xcoord) &
+    !is.na(scottish_munros$ycoord),
+]
+
+```
+
+```{r}
+coords <- as.matrix(munros_2021_df[, c("xcoord", "ycoord")])
+
+dist_obj <- dist(coords)
+dist_mat <- as.matrix(dist_obj)
+
+diag(dist_mat) <- NA
+
+nearest_dist_m <- apply(dist_mat, 1, min, na.rm = TRUE)
+
+munros_2021_df$nearest_munro_m <- nearest_dist_m
+munros_2021_df$nearest_munro_km <- nearest_dist_m / 1000
+```
+
+```{r}
+most_remote <- munros_2021_df[which.max(munros_2021_df$nearest_munro_km), ]
+
+most_remote
+```
+
+
