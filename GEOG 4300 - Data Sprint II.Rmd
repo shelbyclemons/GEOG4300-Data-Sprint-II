@@ -101,4 +101,9 @@ most_remote <- munros_2021_df[which.max(munros_2021_df$nearest_munro_km), ]
 most_remote
 ```
 
-
+```{r}
+knitr::kable(
+  most_remote,
+  caption = "Most Remote Munro"
+)
+```
